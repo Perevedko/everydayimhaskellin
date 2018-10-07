@@ -9,34 +9,33 @@ import Data.Map as Map
 import Data.Function
 import Text.Printf
 
-data Command =
-  Assignment String Expr |
-  Output String
-    deriving (Show, Eq)
+data Command = Assignm String Expr
+             | Output String
+                deriving (Show, Eq)
 
-data Expr =
-  Exp Operation Expr Expr |
-  Value Int |
-  Literal String |
-  Reference String |
-  NonValid String
-    deriving (Show, Eq)
+data Expr = Exp Operation Expr Expr
+          | Value Int
+          | Literal String
+          | Reference String
+          | NonValid String
+              deriving (Show, Eq)
 
-data Operation = Add | Mul
-  deriving (Show, Eq)
+data Operation = Add
+               | Mul
+                  deriving (Show, Eq)
 
 isExp (Exp _ _ _) = True
 isExp  _          = False
 
-assignmentOpL = "<-"
-assignmentOpR = "->"
+assignOpL = "<-"
+assignOpR = "->"
 
-isAssignmentL x = isInfixOf assignmentOpL x
-isAssignmentR x = isInfixOf assignmentOpR x
-isAssignment x = isAssignmentL x || isAssignmentR x
-isOutput x = not $ isAssignment x
+isAssignmL = isInfixOf assignOpL
+isAssignmR = isInfixOf assignOpR
+isAssignm x = isAssignmL x || isAssignmR x
+isOutput = not . isAssignm
 isWord s = List.all isAlpha s
-isAdd s = isJust $ find (=='+') s
+isAdd = isJust . (find (=='+'))
 quote = '"'
 quoted s = head s == quote && last s == quote
 unquote = init . tail
@@ -45,64 +44,64 @@ parseExpr s
   | all isDigit s = Value $ read s
   | all isAlpha s = Reference s
   | quoted s = Literal $ unquote s
-  | isAdd s =
-      let elems = splitOn "+" s
-          left  = parseExpr $ head elems
-          right = parseExpr $ intercalate "+" $ tail elems
-      in Exp Add left right
+  | isAdd s = Exp Add left right
   | otherwise = NonValid s
+  where elems = splitOn "+" s
+        left  = parseExpr $ head elems
+        right = parseExpr $ intercalate "+" $ tail elems
 
-parseAssignmentL s =
-  let elems = splitOn assignmentOpL s
-      name = elems !! 0
-      value = parseExpr $ elems !! 1
-  in Assignment name value
 
-parseAssignmentR s =
-  let elems = splitOn assignmentOpR s
-      value = parseExpr $ elems !! 0
-      name = elems !! 1
-  in Assignment name value
+parseAssignmL s = Assignm name value
+                      where elems = splitOn assignOpL s
+                            name = elems !! 0
+                            value = parseExpr $ elems !! 1
+
+parseAssignmR s = Assignm name value
+                      where elems = splitOn assignOpR s
+                            value = parseExpr $ elems !! 0
+                            name = elems !! 1
 
 parseCommand s
-  | isAssignmentL s = parseAssignmentL s
-  | isAssignmentR s = parseAssignmentR s
+  | isAssignmL s = parseAssignmL s
+  | isAssignmR s = parseAssignmR s
   | otherwise = Output s
 
+
+skiper x d = case x of Assignm k v -> Map.insert k v d
+                       Output  _   -> d
+
 toDict :: [Command] -> Map String Expr
-toDict cmnds =
-  toDict' cmnds Map.empty
-    where
-      toDict' []     hash = hash
-      toDict' (x:xs) hash =
-        case x of
-          Assignment k v -> Map.insert k v dict
-          Output     _   -> dict
-        where dict = toDict' xs hash
+toDict cmnds = toDict' cmnds Map.empty
+  where toDict' []     hash = hash
+        toDict' (x:xs) hash = let dict = toDict' xs hash
+                              in skiper x dict
+
+toDict cmnds = toDict' cmnds Map.empty
+  where toDict' []     hash = hash
+        toDict' (x:xs) hash = let dict = toDict' xs hash
+                              in skiper x dict
+
 
 evalExp (Exp Add a b) = (evalExp a) + (evalExp b)
 evalExp (Exp Mul a b) = (evalExp a) * (evalExp b)
 evalExp (Value x) = x
 
 
-readVariables text =
-    List.filter (/=' ') text
-  & lines
-  & List.map parseCommand
-  & toDict
+readVariables text = List.filter (/=' ') text
+                   & lines
+                   & List.map parseCommand
+                   & toDict
 
 joinLines = intercalate "\n"
 
-pairPrinter (k, v) = printf "Key %s maps to '%s'" (show k) (show v)
-
+pairPrinter   (k, v) = printf "Key %s maps to '%s'" (show k) (show v)
 pairPrintEval (k, v) = printf "%s evaluated is %s" mapd evald
     where mapd = pairPrinter (k, v) :: String
           evald = show $ evalExp v
 
-prettify f hash =
-    toList hash
-  & List.map f
-  & joinLines
+prettify f hash = toList hash
+                & List.map f
+                & joinLines
 
 hashKeys   h = List.map fst $ toList h
 hashValues h = List.map snd $ toList h
