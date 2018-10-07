@@ -9,7 +9,7 @@ import Data.Map as Map
 import Data.Function
 import Text.Printf
 
-data Command = Assignm String Expr
+data Command = Assign String Expr
              | Output String
                 deriving (Show, Eq)
 
@@ -30,10 +30,10 @@ isExp  _          = False
 assignOpL = "<-"
 assignOpR = "->"
 
-isAssignmL = isInfixOf assignOpL
-isAssignmR = isInfixOf assignOpR
-isAssignm x = isAssignmL x || isAssignmR x
-isOutput = not . isAssignm
+isAssignL = isInfixOf assignOpL
+isAssignR = isInfixOf assignOpR
+isAssign x = isAssignL x || isAssignR x
+isOutput = not . isAssign
 isWord s = List.all isAlpha s
 isAdd = isJust . (find (=='+'))
 quote = '"'
@@ -51,23 +51,23 @@ parseExpr s
         right = parseExpr $ intercalate "+" $ tail elems
 
 
-parseAssignmL s = Assignm name value
+parseAssignL s = Assign name value
                       where elems = splitOn assignOpL s
                             name = elems !! 0
                             value = parseExpr $ elems !! 1
 
-parseAssignmR s = Assignm name value
+parseAssignR s = Assign name value
                       where elems = splitOn assignOpR s
                             value = parseExpr $ elems !! 0
                             name = elems !! 1
 
 parseCommand s
-  | isAssignmL s = parseAssignmL s
-  | isAssignmR s = parseAssignmR s
+  | isAssignL s = parseAssignL s
+  | isAssignR s = parseAssignR s
   | otherwise = Output s
 
 
-skiper x d = case x of Assignm k v -> Map.insert k v d
+skiper x d = case x of Assign k v -> Map.insert k v d
                        Output  _   -> d
 
 toDict :: [Command] -> Map String Expr
