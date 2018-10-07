@@ -76,17 +76,19 @@ toDict cmnds = toDict' cmnds Map.empty
         toDict' (x:xs) hash = let dict = toDict' xs hash
                               in skiper x dict
 
-toDict cmnds = toDict' cmnds Map.empty
-  where toDict' []     hash = hash
-        toDict' (x:xs) hash = let dict = toDict' xs hash
-                              in skiper x dict
+evalExp :: Map String Expr -> Expr -> Int
+evalExp d (Exp Add a b) = (evalExp d a) + (evalExp d b)
+evalExp d (Exp Mul a b) = (evalExp d a) * (evalExp d b)
+evalExp d (Reference y) = Map.lookup y d & fromJust & evalExp d
+evalExp d (Value x)     = x
+evalExp d (NonValid x)  = 0
+evalExp d (Literal x)   = 0
+
+duplicate string n = concat $ replicate n string
+lineFiller = duplicate "-" 30
 
 
-evalExp (Exp Add a b) = (evalExp a) + (evalExp b)
-evalExp (Exp Mul a b) = (evalExp a) * (evalExp b)
-evalExp (Value x) = x
-
-
+readVariables :: String -> Map String Expr
 readVariables text = List.filter (/=' ') text
                    & lines
                    & List.map parseCommand
@@ -94,38 +96,34 @@ readVariables text = List.filter (/=' ') text
 
 joinLines = intercalate "\n"
 
-pairPrinter   (k, v) = printf "Key %s maps to '%s'" (show k) (show v)
-pairPrintEval (k, v) = printf "%s evaluated is %s" mapd evald
+pairPrinter (k, v) = printf "Key %s maps to '%s'" (show k) (show v)
+pairPrintEval d (k, v) = printf "%s evaluated to %s" mapd evald
     where mapd = pairPrinter (k, v) :: String
-          evald = show $ evalExp v
+          evald = show $ evalExp d v
 
-prettify f hash = toList hash
-                & List.map f
-                & joinLines
+prettify hash = toList hash
+              & List.map (pairPrintEval hash)
+              & joinLines
 
 hashKeys   h = List.map fst $ toList h
 hashValues h = List.map snd $ toList h
 
-duplicate string n = concat $ replicate n string
-lineFiller = duplicate "-" 30
 
 main = do
   content <- readFile "lang/ex.txt"
-  let variables = readVariables content
-  -- putStrLn $ show variables
-  --putStrLn "Full hashmap:"
+  let vars = readVariables content
   putStrLn lineFiller
-  putStrLn $ prettify pairPrinter variables
+  putStrLn $ prettify vars
   putStrLn lineFiller
-  let expOnly = Map.filter isExp variables
+  --let expOnly = Map.filter isExp variables
   --putStrLn "Exp only:"
   --putStrLn $ prettify expOnly
   --putStrLn $ show $ hashValues expOnly
-  putStrLn $ prettify pairPrintEval expOnly
+  --putStrLn $ prettify (pairPrintEval varlist) variables
 
-  putStrLn "Which variable to read?"
-  var <- getLine
-  let found = Map.lookup var variables
-  case found of
-    Just v  -> putStrLn $ "found: " ++ (show v)
-    Nothing -> putStrLn $ "not found"
+  --putStrLn "Which variable to read?"
+  -- var <- getLine
+  -- let found = Map.lookup var variables
+  -- case found of
+  --   Just v  -> putStrLn $ "found: " ++ (show v)
+  --   Nothing -> putStrLn $ "not found"
